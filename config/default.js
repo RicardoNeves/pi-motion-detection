@@ -7,8 +7,8 @@ module.exports = {
     photoHeight: 100,
 
     videoTimeout: 5000,
-    videoWidth: 1920,
-    videoHeight: 1080,
+    videoWidth: 1280,
+    videoHeight: 720,
 
     compareThreshold: 0.1,
   },
