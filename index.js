@@ -13,7 +13,7 @@ class MotionDetectionModule extends EventEmitter {
       captureDirectory: null, // Directory to store tmp photos and video captures
       // continueAfterMotion: false, // Flag to control if motion detection will continue after detection
       triggerVideoRecordOnMotion: false, // Flag to control video capture on motion detection
-      timeout: 5000,
+      motionCheckInterval: 30000,
     }, options);
 
     // this.continueToCapture = true; // Flag to control internal state of photo capture
@@ -42,37 +42,24 @@ class MotionDetectionModule extends EventEmitter {
       if (message.result === 'failure') {
         self.emit('error', `Image capture failed: ${message.error}`);
       } else if (message.result === 'success') {
-        // console.log('Picture Taken!');
         this.capturingPhoto = false;
-        // console.log('Captured photo');
-        // if (self.continueToCapture) {
-        //   self.capturingPhoto = true;
-        // }
+
+        if (this.runCheckWhenCameraReady) {
+          checkInterval.bind(this)();
+        }        
       }
-      // else {
-      //   // console.log(`Message from imageCaptureChild: ${ message }`);
-      // }
     });
 
     imageCompare.on('motion', () => {
-      // self.capturingPhoto = false;
-      // self.continueToCapture = false;
       if (this.config.triggerVideoRecordOnMotion) {
         this.recordQueue.push('video');
-        checkInterval.bind(this)();
       }
 
-      self.emit('motion');
+      // @todo: push image
 
-      // if (self.config.captureVideoOnMotion) {
-      //   if (self.capturingPhoto) {
-      //     self.emit('error', 'Hit possible race condition, not capturing video at this time.');
-      //   }
-      //   else {
-      //     // console.log('It should be safe to capture video');
-      //     videoCaptureChild.send({});
-      //   }
-      // }
+      onMotionCheck.bind(this)();      
+
+      self.emit('motion');
     });
     imageCompare.on('error', (error) => {
       self.emit('error', error);
@@ -83,18 +70,11 @@ class MotionDetectionModule extends EventEmitter {
         self.emit('error', `Video capture failed: ${message.error}`);
       }
       else if (message.result === 'success') {
-        console.log('Video record success!');
+        this.capturingPhoto = false;
 
         if (this.runCheckWhenCameraReady) {
-          this.checkInterval();
+          checkInterval.bind(this)();
         }
-
-        this.capturingPhoto = false;
-      //   self.continueToCapture = true;
-      //   imageCaptureChild.send({});
-      // }
-      // else {
-      //   // console.log(`Message from videoCaptureChild: ${ message }`);
       }
     });
 
@@ -102,29 +82,38 @@ class MotionDetectionModule extends EventEmitter {
       if (message.result === 'failure') {
         self.emit('error', message.error);
       }
-      else if (message.result === 'success') {
-        // I don't think this ever gets hit...
-      }
-      else {
-        // console.log(`Message from videoCaptureChild: ${ message }`);
-      }
     });
 
     // Start the magic
-    
-    // self.capturingPhoto = true;
-    // imageCaptureChild.send({});
-    setInterval(checkInterval.bind(this), this.config.timeout);
-    // setTimeout(check.bind(this), 5000);
+    checkInterval.bind(this)(false);
   }
 }
 
-function checkInterval() {
-  console.log('Check underway...');
+function checkInterval(isCallbackCall = true) {
+  // console.log(`Check underway at ${(new Date()).toLocaleTimeString()}...`);
+  // if called during cam use then update callback otherwise clean it.
+  // if cam in use ends
+  if (this.capturingPhoto) {
+    this.runCheckWhenCameraReady = true;
+    return;
+  } else {
+    this.runCheckWhenCameraReady = false;
+  }
+
+  // Force picture to check motion
+  this.capturingPhoto = true;
+  this.imageCaptureChild.send({});
+  // Make sure to call check with timeout
+  setTimeout(checkInterval.bind(this, false), this.config.motionCheckInterval);
+
+  return;
+}
+
+function onMotionCheck() {
   if (!this.capturingPhoto && this.recordQueue.length) {
     const action = this.recordQueue.pop();
 
-    if (this.action === 'video') {
+    if (action === 'video') {
       console.log(`Will run ${action} record...`);
       this.capturingPhoto = true;
       this.videoCaptureChild.send({})
@@ -132,24 +121,6 @@ function checkInterval() {
 
     return;
   }
-  // Not capturing
-  if (this.capturingPhoto || this.runCheckWhenCameraReady) {
-    console.log('Camera in use. Will run when camera ready...');
-    return;
-  }
-
-  // Nothing to do
-  // Let's take a picture to trigger image comparison?
-  //if (this.queue.length === 0) {
-    // console.log('Requesting to take a picture');
-    this.capturingPhoto = true;
-    this.imageCaptureChild.send({});
-
-    return;
-  //}
-
-
-  // setTimeout(this.check, 5000);
 }
 
 function captureDirsCheck(base) {

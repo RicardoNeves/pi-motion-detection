@@ -3,12 +3,12 @@ const MotionDetectionModule = require('./index.js');
 const motionDetector = new MotionDetectionModule({
   captureDirectory: path.resolve(__dirname, 'captures'),
   keepMotionImages: false,
-  timeout: 10000,
+  motionCheckInterval: 30000,
   triggerVideoRecordOnMotion: true,
 });
  
 motionDetector.on('motion', () => {
-  console.log('--- Motion detected ---');
+  console.log(`--- Motion detected at ${(new Date()).toLocaleTimeString()} ---`);
 });
  
 motionDetector.on('error', (error) => {
@@ -16,6 +16,4 @@ motionDetector.on('error', (error) => {
 });
  
 motionDetector.watch();
-
-console.log('Ready to detect motion...');
 

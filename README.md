@@ -49,3 +49,7 @@ const motionDetector = new MotionDetectionModule({
                                // Flag to control video capture on motion detection
 });
 ```
+
+## @todo
+- fix check timeout run after record check (aka interval <)
+- add pic as action
